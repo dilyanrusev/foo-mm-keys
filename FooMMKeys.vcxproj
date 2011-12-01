@@ -78,7 +78,6 @@
     <ClCompile Include="source\ComInit.cpp" />
     <ClCompile Include="source\common.cpp" />
     <ClCompile Include="source\HotkeyRegistration.cpp" />
-    <ClCompile Include="source\main2.cpp" />
     <ClCompile Include="source\stdafx.cpp" />
     <ClCompile Include="source\WinMain.cpp" />
   </ItemGroup>
@@ -94,6 +93,7 @@
   <ItemGroup>
     <None Include="resources\FooMMKeys.ico" />
     <None Include="resources\small.ico" />
+    <None Include="source\COPYING.txt" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources\FooMMKeys.rc" />

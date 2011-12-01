@@ -21,9 +21,6 @@
     <ClCompile Include="source\HotkeyRegistration.cpp">
       <Filter>source</Filter>
     </ClCompile>
-    <ClCompile Include="source\main2.cpp">
-      <Filter>source</Filter>
-    </ClCompile>
     <ClCompile Include="source\stdafx.cpp">
       <Filter>source</Filter>
     </ClCompile>
@@ -61,6 +58,7 @@
     <None Include="resources\small.ico">
       <Filter>resources</Filter>
     </None>
+    <None Include="source\COPYING.txt" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources\FooMMKeys.rc">
