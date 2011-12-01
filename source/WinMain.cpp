@@ -25,19 +25,20 @@ DAMAGE.
 */
 
 #include "stdafx.h"
+#include "Shlwapi.h"
 #include "Resource.hxx"
 #include "HotkeyRegistration.hxx"
 #include "ComInit.hxx"
 #include "AudioEndpointHandle.hxx"
 #include "common.hxx"
+#include "winbase.h"
 
 #define WM_FOO_NOTIFY (WM_USER + 1)
 
 // HIWORD(lparam) when messages is WM_FOO_NOTIFY
-// {7A5F0E4B-CE5E-46A3-94BA-663F1746CAE5}
+// {C7C2DDFE-76D5-400B-A14F-2284D60B2B8C}
 static const GUID GUID_FOOMM_NOTIFYICON = 
-{ 0x7a5f0e4b, 0xce5e, 0x46a3, { 0x94, 0xba, 0x66, 0x3f, 0x17, 0x46, 0xca, 0xe5 } };
-
+{ 0xc7c2ddfe, 0x76d5, 0x400b, { 0xa1, 0x4f, 0x22, 0x84, 0xd6, 0xb, 0x2b, 0x8c } };
 
 struct MainWindowData {	
 	MainWindowData() 
@@ -48,6 +49,25 @@ struct MainWindowData {
 	AudioEndpointHandle *pAudio;
 	NOTIFYICONDATA notify;	
 	HINSTANCE hInst;
+};
+
+class AppLockMutex {
+	HANDLE _hMutex;
+
+public:	
+	AppLockMutex() 
+			: _hMutex(NULL) {
+		_hMutex = CreateMutexEx(NULL, L"FooMMKeysAppLock", CREATE_MUTEX_INITIAL_OWNER, WRITE_OWNER);
+		if (NULL == _hMutex) {
+			throw std::runtime_error("Foo MM Keys already running");
+		}
+	}
+
+	~AppLockMutex() {
+		if (NULL != _hMutex) {
+			ReleaseMutex(_hMutex);
+		}
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -65,6 +85,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR lpCmdLine, int nCmdShow)
 {
 	try {		
+		AppLockMutex appLock;
 		ComInit comInit;
 		AudioEndpointHandle audioHandle;			
 		MainWindowData data;
@@ -77,7 +98,7 @@ int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR lpCmdLine, in
 		HotkeyRegistration hkDown(hwnd, Hotkey_VolumeDown, MOD_ALT | MOD_CONTROL, VK_F11);
 		HotkeyRegistration hkUp(hwnd, Hotkey_VolumeUp, MOD_ALT | MOD_CONTROL, VK_F12);
 		HotkeyRegistration hkQuit(hwnd, Hotkey_Quit, MOD_ALT | MOD_CONTROL, VK_BACK);
-
+		
 		return run_message_loop();
 	}
 	catch (const std::exception &ex) {
@@ -129,28 +150,12 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	{
 		LPCREATESTRUCT cs = (LPCREATESTRUCT)lparam;
 		pData = (MainWindowData*)cs->lpCreateParams;
-				
-		ZeroMemory(&pData->notify, sizeof(NOTIFYICONDATA));
-		pData->notify.cbSize = sizeof(NOTIFYICONDATA);
-		pData->notify.hWnd = hwnd;
-		pData->notify.uFlags = NIF_ICON | NIF_TIP | NIF_GUID | NIF_MESSAGE;
-		pData->notify.guidItem = GUID_FOOMM_NOTIFYICON;
-		pData->notify.uCallbackMessage = WM_FOO_NOTIFY;		
-		pData->notify.uVersion = NOTIFYICON_VERSION_4;
-		StringCchCopy(pData->notify.szTip, ARRAYSIZE(pData->notify.szTip), L"Foo MM Keys: double click to toggle visibility");
-		pData->notify.hIcon = LoadIcon(pData->hInst, MAKEINTRESOURCE(IDI_SMALL));	
-
-
-		if (!Shell_NotifyIcon(NIM_ADD, &pData->notify)) {
-			show_last_error(L"Shell_NotifyIcon: NIM_ADD");
-		}
 		break;
 	}
 
 	case WM_FOO_NOTIFY:
 	{		
-		int notification = LOWORD(lparam);
-		switch (notification)
+		switch (lparam)
 		{
 		case WM_LBUTTONDBLCLK:
 			if (IsWindowVisible(hwnd)) {
@@ -228,6 +233,47 @@ HWND create_main_window(HINSTANCE hInst, MainWindowData *pData) {
 		HWND_DESKTOP, NULL, hInst, pData);
 	if (NULL == hwnd) {
 		throw std::runtime_error("CreateWindow failed");
+	}
+	
+	DLLGETVERSIONPROC DllGetVersion = (DLLGETVERSIONPROC)GetProcAddress(GetModuleHandle(L"Shell32.dll"), "DllGetVersion");
+	if (NULL == DllGetVersion) {
+		throw std::runtime_error("Can't get DllGetVersion from Shell32.dll");
+	}
+	DLLVERSIONINFO verInfo;
+	verInfo.cbSize = sizeof(verInfo);
+	DllGetVersion(&verInfo);
+	
+	NOTIFYICONDATA niData; 
+	ZeroMemory(&niData,sizeof(NOTIFYICONDATA));
+
+	if(verInfo.dwMajorVersion >= 6) {
+		niData.cbSize = sizeof(NOTIFYICONDATA);
+	}
+	else if(verInfo.dwMajorVersion >= 5) {
+		niData.cbSize = NOTIFYICONDATA_V2_SIZE;
+	}
+	else {
+		niData.cbSize = NOTIFYICONDATA_V1_SIZE;
+	}
+
+	niData.uID = 1;
+	niData.uFlags = NIF_ICON|NIF_MESSAGE|NIF_TIP;
+	niData.hIcon =
+		(HICON)LoadImage( hInst,
+			MAKEINTRESOURCE(IDI_FOOMMKEYS),
+			IMAGE_ICON,
+			GetSystemMetrics(SM_CXSMICON),
+			GetSystemMetrics(SM_CYSMICON),
+			LR_DEFAULTCOLOR);
+	niData.hWnd = hwnd;
+	niData.uCallbackMessage = WM_FOO_NOTIFY;
+
+
+	pData->notify = niData;
+	
+	if (!Shell_NotifyIcon(NIM_ADD, &pData->notify)) {
+		
+		show_last_error(L"Shell_NotifyIcon: NIM_ADD");
 	}
 
 	ShowWindow(hwnd, SW_HIDE);
