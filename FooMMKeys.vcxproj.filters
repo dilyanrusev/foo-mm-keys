@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="source">
+      <UniqueIdentifier>{719843a2-2f6c-449c-93fc-53353bb27678}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="resources">
+      <UniqueIdentifier>{ac60da6c-a29c-44f1-9401-93c5ac076848}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="source\AudioEndpointHandle.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\ComInit.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\common.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\HotkeyRegistration.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\main2.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\stdafx.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\WinMain.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="source\AudioEndpointHandle.hxx">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\ComInit.hxx">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\common.hxx">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\HotkeyRegistration.hxx">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\stdafx.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\targetver.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Resource.hxx">
+      <Filter>source</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resources\FooMMKeys.ico">
+      <Filter>resources</Filter>
+    </None>
+    <None Include="resources\small.ico">
+      <Filter>resources</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resources\FooMMKeys.rc">
+      <Filter>resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,8 @@
+syntax=glob
+Debug/*
+ipch/*
+FooMMKeys.sdf
+FooMMKeys.vcxproj.user
+FooMMKeys.opensdf
+FooMMKeys.sln.docstates.suo
+FooMMKeys.suo
