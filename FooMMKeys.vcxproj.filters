@@ -58,7 +58,7 @@
     <None Include="resources\small.ico">
       <Filter>resources</Filter>
     </None>
-    <None Include="source\COPYING.txt" />
+    <None Include="COPYING.txt" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources\FooMMKeys.rc">

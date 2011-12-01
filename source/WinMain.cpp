@@ -31,20 +31,32 @@ DAMAGE.
 #include "AudioEndpointHandle.hxx"
 #include "common.hxx"
 
-struct MainWindowData {
+#define WM_FOO_NOTIFY (WM_USER + 1)
+
+// HIWORD(lparam) when messages is WM_FOO_NOTIFY
+// {7A5F0E4B-CE5E-46A3-94BA-663F1746CAE5}
+static const GUID GUID_FOOMM_NOTIFYICON = 
+{ 0x7a5f0e4b, 0xce5e, 0x46a3, { 0x94, 0xba, 0x66, 0x3f, 0x17, 0x46, 0xca, 0xe5 } };
+
+
+struct MainWindowData {	
 	MainWindowData() 
-		: pAudio(NULL) {
+			: pAudio(NULL)
+			, hInst(NULL) {
 	}
 
 	AudioEndpointHandle *pAudio;
+	NOTIFYICONDATA notify;	
+	HINSTANCE hInst;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 // Functions
 ///////////////////////////////////////////////////////////////////////////////
+void show_last_error(const std::wstring& title);
 int run_message_loop();
 void handle_hotkey(Hotkeys hotkey);
-HWND create_main_window(HINSTANCE hInst, int show, MainWindowData *pAudio);
+HWND create_main_window(HINSTANCE hInst, MainWindowData *pAudio);
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -59,7 +71,7 @@ int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR lpCmdLine, in
 		
 		data.pAudio = &audioHandle;
 		
-		HWND hwnd = create_main_window(hInst, nCmdShow, &data);
+		HWND hwnd = create_main_window(hInst, &data);
 
 		HotkeyRegistration hkToggle(hwnd, Hotkey_ToggleVolume, MOD_ALT | MOD_CONTROL, VK_F10);
 		HotkeyRegistration hkDown(hwnd, Hotkey_VolumeDown, MOD_ALT | MOD_CONTROL, VK_F11);
@@ -117,9 +129,41 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	{
 		LPCREATESTRUCT cs = (LPCREATESTRUCT)lparam;
 		pData = (MainWindowData*)cs->lpCreateParams;
+				
+		ZeroMemory(&pData->notify, sizeof(NOTIFYICONDATA));
+		pData->notify.cbSize = sizeof(NOTIFYICONDATA);
+		pData->notify.hWnd = hwnd;
+		pData->notify.uFlags = NIF_ICON | NIF_TIP | NIF_GUID | NIF_MESSAGE;
+		pData->notify.guidItem = GUID_FOOMM_NOTIFYICON;
+		pData->notify.uCallbackMessage = WM_FOO_NOTIFY;		
+		pData->notify.uVersion = NOTIFYICON_VERSION_4;
+		StringCchCopy(pData->notify.szTip, ARRAYSIZE(pData->notify.szTip), L"Foo MM Keys: double click to toggle visibility");
+		pData->notify.hIcon = LoadIcon(pData->hInst, MAKEINTRESOURCE(IDI_SMALL));	
+
+
+		if (!Shell_NotifyIcon(NIM_ADD, &pData->notify)) {
+			show_last_error(L"Shell_NotifyIcon: NIM_ADD");
+		}
 		break;
 	}
-	
+
+	case WM_FOO_NOTIFY:
+	{		
+		int notification = LOWORD(lparam);
+		switch (notification)
+		{
+		case WM_LBUTTONDBLCLK:
+			if (IsWindowVisible(hwnd)) {
+				ShowWindow(hwnd, SW_HIDE);
+			}
+			else {
+				ShowWindow(hwnd, SW_SHOW);
+			}
+			break;
+		}
+		break;
+	}		
+
 	case WM_HOTKEY:
 		if (NULL != pData) {
 			handle_hotkey((Hotkeys)wparam, pData->pAudio);
@@ -127,9 +171,12 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 		break;
 
 	case WM_CLOSE:
+		if (!Shell_NotifyIcon(NIM_DELETE, &pData->notify)) {
+			show_last_error(L"Shell_NotifyIcon NIM_DELETE");
+		}
 		DestroyWindow(hwnd);
 		break;
-	case WM_DESTROY:
+	case WM_DESTROY:		
 		PostQuitMessage(0);
 		break;
 	default:
@@ -139,10 +186,15 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Function create_main_window(HINSTANCE, int, MainWindowData*)
+// Function create_main_window(HINSTANCE, MainWindowData*)
 ///////////////////////////////////////////////////////////////////////////////
 
-HWND create_main_window(HINSTANCE hInst, int show, MainWindowData *pData) {
+HWND create_main_window(HINSTANCE hInst, MainWindowData *pData) {
+	if (NULL == pData) {
+		throw std::invalid_argument("pData is NULL");
+	}
+	pData->hInst = hInst;
+
 	WNDCLASSEX wc;
 	wc.cbClsExtra = 0;
 	wc.cbWndExtra = 0;
@@ -155,20 +207,30 @@ HWND create_main_window(HINSTANCE hInst, int show, MainWindowData *pData) {
 	wc.lpfnWndProc = wnd_proc;
 	wc.lpszClassName = L"FooMMKeys";
 	wc.lpszMenuName = NULL;
-	wc.style = CS_HREDRAW | CS_VREDRAW;
+	wc.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
 
 	if (!RegisterClassEx(&wc)) {
 		throw std::runtime_error("RegisterClassEx failed");
 	}
 
+	DWORD style = WS_MINIMIZEBOX | WS_CAPTION | WS_SYSMENU;
+	RECT rt = {0, 0, 300, 300};
+	AdjustWindowRect(&rt, style, FALSE);
+	int width = rt.right - rt.left;
+	int height = rt.bottom - rt.top;
+	int screnWidth = GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+	int posX = (screnWidth - width) / 2;
+	int posY = (screenHeight - height) / 2;
+
 	HWND hwnd = CreateWindow(L"FooMMKeys", L"Foo Multimedia Keys",
-		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+		style, posX, posY, width, height,
 		HWND_DESKTOP, NULL, hInst, pData);
 	if (NULL == hwnd) {
 		throw std::runtime_error("CreateWindow failed");
 	}
 
-	ShowWindow(hwnd, show);
+	ShowWindow(hwnd, SW_HIDE);
 	UpdateWindow(hwnd);
 
 	return hwnd;
@@ -185,4 +247,21 @@ int run_message_loop() {
 		DispatchMessage(&msg);
 	}
 	return (int)msg.wParam;
+}
+
+
+void show_last_error(const std::wstring& title) {
+	DWORD errorCode = GetLastError();
+	LPWSTR pBuffer = NULL;
+	if (FormatMessage(
+		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+		NULL, errorCode, 0,	(LPWSTR)&pBuffer, 1000, NULL) != 0)
+	{
+		MessageBox(NULL, pBuffer, title.c_str(), MB_ICONERROR | MB_OK);
+		LocalFree(pBuffer);
+	}
+	else 
+	{
+		MessageBox(NULL, L"General error", title.c_str(), MB_ICONERROR | MB_OK);
+	}
 }
